@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student Management System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background: linear-gradient(to right, #a1c4fd, #c2e9fb);
+      min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .container {
+      margin-top: 30px;
+    }
+    nav button {
+      margin: 5px;
+    }
+    .section {
+      display: none;
+    }
+    .active-section {
+      display: block;
+    }
+    .message-box {
+      width: 100%;
+      height: 80px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-center mb-4">🎓 Student Management System</h1>
+
+    <div class="text-center mb-3">
+      <button class="btn btn-primary" onclick="showSection('enroll')">Enrollment</button>
+      <button class="btn btn-success" onclick="showSection('attendance')">Attendance</button>
+      <button class="btn btn-warning" onclick="showSection('grades')">Grades</button>
+      <button class="btn btn-info" onclick="showSection('communication')">Communication</button>
+    </div>
+
+    <!-- Enrollment -->
+    <div id="enroll" class="section active-section">
+      <h3>Student Enrollment</h3>
+      <form id="studentForm" class="row g-2">
+        <input type="text" id="studentId" placeholder="Student ID" class="form-control" required />
+        <input type="text" id="studentName" placeholder="Name" class="form-control" required />
+        <input type="number" id="studentAge" placeholder="Age" class="form-control" required />
+        <input type="text" id="studentClass" placeholder="Class" class="form-control" required />
+        <input type="text" id="studentGrade" placeholder="Grade" class="form-control" required />
+        <button type="submit" class="btn btn-dark">Add Student</button>
+      </form>
+      <table class="table table-striped mt-3">
+        <thead><tr><th>ID</th><th>Name</th><th>Age</th><th>Class</th><th>Grade</th><th>Action</th></tr></thead>
+        <tbody id="studentTable"></tbody>
+      </table>
+    </div>
+
+    <!-- Attendance -->
+    <div id="attendance" class="section">
+      <h3>Attendance</h3>
+      <div id="attendanceList"></div>
+      <button onclick="saveAttendance()" class="btn btn-success mt-2">Save Attendance</button>
+    </div>
+
+    <!-- Grades -->
+    <div id="grades" class="section">
+      <h3>Grade Management</h3>
+      <div id="gradesList"></div>
+    </div>
+
+    <!-- Communication -->
+    <div id="communication" class="section">
+      <h3>Communication</h3>
+      <div class="mb-2">
+        <select id="senderRole" class="form-select">
+          <option value="Student">Student</option>
+          <option value="Teacher">Teacher</option>
+          <option value="Parent">Parent</option>
+        </select>
+      </div>
+      <textarea id="messageBox" class="form-control message-box" placeholder="Write a message..."></textarea>
+      <button onclick="sendMessage()" class="btn btn-info mt-2">Send</button>
+
+      <div class="mt-3 d-flex justify-content-between align-items-center">
+        <label for="filterRole">Filter by role:</label>
+        <select id="filterRole" class="form-select w-auto" onchange="renderMessages()">
+          <option value="All">All</option>
+          <option value="Student">Student</option>
+          <option value="Teacher">Teacher</option>
+          <option value="Parent">Parent</option>
+        </select>
+      </div>
+      <ul id="messageList" class="mt-3 list-group"></ul>
+    </div>
+  </div>
+
+  <script>
+    const studentForm = document.getElementById('studentForm');
+    const studentTable = document.getElementById('studentTable');
+    const attendanceList = document.getElementById('attendanceList');
+    const gradesList = document.getElementById('gradesList');
+    const messageList = document.getElementById('messageList');
+
+    let students = JSON.parse(localStorage.getItem('students')) || [];
+    let attendance = JSON.parse(localStorage.getItem('attendance')) || {};
+    let messages = JSON.parse(localStorage.getItem('messages')) || [];
+
+    function saveStudents() {
+      localStorage.setItem('students', JSON.stringify(students));
+    }
+
+    function renderTable() {
+      studentTable.innerHTML = '';
+      students.forEach((s, i) => {
+        const row = `<tr>
+          <td>${s.id}</td>
+          <td>${s.name}</td>
+          <td>${s.age}</td>
+          <td>${s.class}</td>
+          <td>${s.grade || ''}</td>
+          <td><button class='btn btn-danger btn-sm' onclick='deleteStudent(${i})'>Delete</button></td>
+        </tr>`;
+        studentTable.innerHTML += row;
+      });
+    }
+
+    function renderAttendance() {
+      attendanceList.innerHTML = '';
+      students.forEach(s => {
+        const checked = attendance[s.id] ? 'checked' : '';
+        attendanceList.innerHTML += `
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" data-id="${s.id}" ${checked}>
+            <label class="form-check-label">${s.name}</label>
+          </div>`;
+      });
+    }
+
+    function saveAttendance() {
+      document.querySelectorAll('#attendanceList input').forEach(input => {
+        const id = input.getAttribute('data-id');
+        attendance[id] = input.checked;
+      });
+      localStorage.setItem('attendance', JSON.stringify(attendance));
+      alert('Attendance saved!');
+    }
+
+    function renderGrades() {
+      gradesList.innerHTML = '';
+      students.forEach(s => {
+        gradesList.innerHTML += `
+          <div class="input-group mb-2">
+            <span class="input-group-text">${s.name}</span>
+            <input type="text" class="form-control" value="${s.grade || ''}" onchange="updateGrade('${s.id}', this.value)">
+          </div>`;
+      });
+    }
+
+    function updateGrade(id, grade) {
+      students = students.map(s => s.id === id ? { ...s, grade } : s);
+      saveStudents();
+      renderTable();
+    }
+
+    function sendMessage() {
+      const msgBox = document.getElementById('messageBox');
+      const senderRole = document.getElementById('senderRole').value;
+      const message = msgBox.value.trim();
+      if (message) {
+        messages.push({
+          text: message,
+          time: new Date().toLocaleString(),
+          role: senderRole
+        });
+        localStorage.setItem('messages', JSON.stringify(messages));
+        msgBox.value = '';
+        renderMessages();
+      }
+    }
+
+    function deleteMessage(index) {
+      messages.splice(index, 1);
+      localStorage.setItem('messages', JSON.stringify(messages));
+      renderMessages();
+    }
+
+    function renderMessages() {
+      const filterRole = document.getElementById('filterRole').value;
+      messageList.innerHTML = '';
+      messages.forEach((m, i) => {
+        if (filterRole === "All" || m.role === filterRole) {
+          messageList.innerHTML += `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <div><strong>[${m.role}]</strong> ${m.time}: ${m.text}</div>
+              <button class="btn btn-sm btn-danger" onclick="deleteMessage(${i})">Delete</button>
+            </li>`;
+        }
+      });
+    }
+
+    function deleteStudent(index) {
+      students.splice(index, 1);
+      saveStudents();
+      renderTable();
+    }
+
+    studentForm.onsubmit = (e) => {
+      e.preventDefault();
+      const student = {
+        id: studentForm.studentId.value,
+        name: studentForm.studentName.value,
+        age: studentForm.studentAge.value,
+        class: studentForm.studentClass.value,
+        grade: studentForm.studentGrade.value
+      };
+      students.push(student);
+      saveStudents();
+      renderTable();
+      studentForm.reset();
+    };
+
+    function showSection(id) {
+      document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active-section'));
+      document.getElementById(id).classList.add('active-section');
+      if (id === 'attendance') renderAttendance();
+      if (id === 'grades') renderGrades();
+      if (id === 'communication') renderMessages();
+    }
+
+    renderTable();
+  </script>
+</body>
+</html>
